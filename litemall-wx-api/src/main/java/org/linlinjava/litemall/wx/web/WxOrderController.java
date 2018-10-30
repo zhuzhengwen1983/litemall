@@ -102,9 +102,6 @@ public class WxOrderController {
     @Autowired
     private ExpressService expressService;
 
-    public WxOrderController() {
-    }
-
     private String detailedAddress(LitemallAddress litemallAddress) {
         Integer provinceId = litemallAddress.getProvinceId();
         Integer cityId = litemallAddress.getCityId();
@@ -141,7 +138,7 @@ public class WxOrderController {
      * }
      * 失败则 { errno: XXX, errmsg: XXX }
      */
-    @RequestMapping("list")
+    @GetMapping("list")
     public Object list(@LoginUser Integer userId,
                        @RequestParam(defaultValue = "0") Integer showType,
                        @RequestParam(defaultValue = "1") Integer page,
@@ -227,7 +224,7 @@ public class WxOrderController {
         Map<String, Object> orderVo = new HashMap<String, Object>();
         orderVo.put("id", order.getId());
         orderVo.put("orderSn", order.getOrderSn());
-        orderVo.put("addTime", LocalDate.now());
+        orderVo.put("addTime", order.getAddTime());
         orderVo.put("consignee", order.getConsignee());
         orderVo.put("mobile", order.getMobile());
         orderVo.put("address", order.getAddress());
@@ -315,6 +312,9 @@ public class WxOrderController {
 
         // 收货地址
         LitemallAddress checkedAddress = addressService.findById(addressId);
+        if(checkedAddress == null){
+            return ResponseUtil.badArgument();
+        }
 
         // 获取可用的优惠券信息
         // 使用优惠券减免的金额
@@ -499,6 +499,8 @@ public class WxOrderController {
             return ResponseUtil.badArgumentValue();
         }
 
+        Integer version = order.getVersion();
+
         // 检测是否能够取消
         OrderHandleOption handleOption = OrderUtil.build(order);
         if (!handleOption.isCancel()) {
@@ -513,7 +515,7 @@ public class WxOrderController {
             // 设置订单已取消状态
             order.setOrderStatus(OrderUtil.STATUS_CANCEL);
             order.setEndTime(LocalDateTime.now());
-            if(orderService.updateById(order) == 0){
+            if(orderService.updateByIdWithVersion(version, order) == 0){
                 throw new Exception("更新数据已失效");
             }
 
@@ -569,6 +571,8 @@ public class WxOrderController {
             return ResponseUtil.badArgumentValue();
         }
 
+        Integer version = order.getVersion();
+
         // 检测是否能够取消
         OrderHandleOption handleOption = OrderUtil.build(order);
         if (!handleOption.isPay()) {
@@ -611,7 +615,7 @@ public class WxOrderController {
             return ResponseUtil.fail(403, "订单不能支付");
         }
 
-        if(orderService.updateById(order) == 0){
+        if(orderService.updateByIdWithVersion(version, order) == 0){
             return ResponseUtil.updatedDateExpired();
         }
         return ResponseUtil.ok(result);
@@ -662,6 +666,8 @@ public class WxOrderController {
             return WxPayNotifyResponse.fail("订单不存在 sn=" + orderSn);
         }
 
+        Integer version = order.getVersion();
+
         // 检查这个订单是否已经处理过
         if (OrderUtil.isPayStatus(order) && order.getPayId() != null) {
             return WxPayNotifyResponse.success("订单已经处理成功!");
@@ -675,18 +681,19 @@ public class WxOrderController {
         order.setPayId(payId);
         order.setPayTime(LocalDateTime.now());
         order.setOrderStatus(OrderUtil.STATUS_PAY);
-        if (orderService.updateById(order) == 0) {
+        if (orderService.updateByIdWithVersion(version, order) == 0) {
             // 这里可能存在这样一个问题，用户支付和系统自动取消订单发生在同时
             // 如果数据库首先因为系统自动取消订单而更新了订单状态；
             // 此时用户支付完成回调这里也要更新数据库，而由于乐观锁机制这里的更新会失败
             // 因此，这里会重新读取数据库检查状态是否是订单自动取消，如果是则更新成支付状态。
             order = orderService.findBySn(orderSn);
+            version = order.getVersion();
             int updated = 0;
             if(OrderUtil.isAutoCancelStatus(order)){
                 order.setPayId(payId);
                 order.setPayTime(LocalDateTime.now());
                 order.setOrderStatus(OrderUtil.STATUS_PAY);
-                updated = orderService.updateById(order);
+                updated = orderService.updateByIdWithVersion(version, order);
             }
 
             // 如果updated是0，那么数据库更新失败
@@ -761,6 +768,8 @@ public class WxOrderController {
             return ResponseUtil.badArgumentValue();
         }
 
+        Integer version = order.getVersion();
+
         OrderHandleOption handleOption = OrderUtil.build(order);
         if (!handleOption.isRefund()) {
             return ResponseUtil.fail(403, "订单不能取消");
@@ -768,7 +777,7 @@ public class WxOrderController {
 
         // 设置订单申请退款状态
         order.setOrderStatus(OrderUtil.STATUS_REFUND);
-        if(orderService.updateById(order) == 0){
+        if(orderService.updateByIdWithVersion(version, order) == 0){
             return ResponseUtil.updatedDateExpired();
         }
 
@@ -808,6 +817,8 @@ public class WxOrderController {
             return ResponseUtil.badArgumentValue();
         }
 
+        Integer version = order.getVersion();
+
         OrderHandleOption handleOption = OrderUtil.build(order);
         if (!handleOption.isConfirm()) {
             return ResponseUtil.fail(403, "订单不能确认收货");
@@ -815,7 +826,7 @@ public class WxOrderController {
 
         order.setOrderStatus(OrderUtil.STATUS_CONFIRM);
         order.setConfirmTime(LocalDateTime.now());
-        if(orderService.updateById(order) == 0){
+        if(orderService.updateByIdWithVersion(version, order) == 0){
             return ResponseUtil.updatedDateExpired();
         }
         return ResponseUtil.ok();

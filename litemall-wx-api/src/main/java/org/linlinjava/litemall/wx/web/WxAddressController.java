@@ -9,6 +9,7 @@ import org.linlinjava.litemall.db.service.LitemallRegionService;
 import org.linlinjava.litemall.core.util.ResponseUtil;
 import org.linlinjava.litemall.wx.annotation.LoginUser;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -84,10 +85,11 @@ public class WxAddressController {
      *           name: xxx,
      *           provinceId: xxx,
      *           cityId: xxx,
-     *           districtId: xxx,
+     *           areaId: xxx,
      *           mobile: xxx,
      *           address: xxx,
      *           isDefault: xxx,
+     *           version: xxx
      *           provinceName: xxx,
      *           cityName: xxx,
      *           areaName: xxx
@@ -111,10 +113,11 @@ public class WxAddressController {
         data.put("name", address.getName());
         data.put("provinceId", address.getProvinceId());
         data.put("cityId", address.getCityId());
-        data.put("districtId", address.getAreaId());
+        data.put("areaId", address.getAreaId());
         data.put("mobile", address.getMobile());
         data.put("address", address.getAddress());
         data.put("isDefault", address.getIsDefault());
+        data.put("version", address.getVersion());
         String pname = regionService.findById(address.getProvinceId()).getName();
         data.put("provinceName", pname);
         String cname = regionService.findById(address.getCityId()).getName();
@@ -122,6 +125,57 @@ public class WxAddressController {
         String dname = regionService.findById(address.getAreaId()).getName();
         data.put("areaName", dname);
         return ResponseUtil.ok(data);
+    }
+
+    private Object validate(LitemallAddress address) {
+        String name = address.getName();
+        if(StringUtils.isEmpty(name)){
+            return ResponseUtil.badArgument();
+        }
+
+        // 测试收货手机号码是否正确
+        String mobile = address.getMobile();
+        if(StringUtils.isEmpty(mobile)){
+            return ResponseUtil.badArgument();
+        }
+        if(!RegexUtil.isMobileExact(mobile)){
+            return ResponseUtil.badArgument();
+        }
+
+        Integer pid = address.getProvinceId();
+        if(pid == null){
+            return ResponseUtil.badArgument();
+        }
+        if(regionService.findById(pid) == null){
+            return ResponseUtil.badArgumentValue();
+        }
+
+        Integer cid = address.getCityId();
+        if(cid == null){
+            return ResponseUtil.badArgument();
+        }
+        if(regionService.findById(cid) == null){
+            return ResponseUtil.badArgumentValue();
+        }
+
+        Integer aid = address.getAreaId();
+        if(aid == null){
+            return ResponseUtil.badArgument();
+        }
+        if(regionService.findById(aid) == null){
+            return ResponseUtil.badArgumentValue();
+        }
+
+        String detailedAddress = address.getAddress();
+        if(StringUtils.isEmpty(detailedAddress)){
+            return ResponseUtil.badArgument();
+        }
+
+        Boolean isDefault = address.getIsDefault();
+        if(isDefault == null){
+            return ResponseUtil.badArgument();
+        }
+        return null;
     }
 
     /**
@@ -138,14 +192,9 @@ public class WxAddressController {
         if(userId == null){
             return ResponseUtil.unlogin();
         }
-        if(address == null){
-            return ResponseUtil.badArgument();
-        }
-
-        // 测试收货手机号码是否正确
-        String mobile = address.getMobile();
-        if(!RegexUtil.isMobileExact(mobile)){
-            return ResponseUtil.badArgument();
+        Object error = validate(address);
+        if(error != null){
+            return error;
         }
 
         if(address.getIsDefault()){
@@ -160,8 +209,8 @@ public class WxAddressController {
             addressService.add(address);
         } else {
             address.setUserId(userId);
-            if(addressService.updateId(address) == 0){
-                return ResponseUtil.updatedDateExpired();
+            if(addressService.update(address) == 0){
+                return ResponseUtil.updatedDataFailed();
             }
         }
         return ResponseUtil.ok(address.getId());
@@ -181,12 +230,9 @@ public class WxAddressController {
         if(userId == null){
             return ResponseUtil.unlogin();
         }
-        if(address == null){
-            return ResponseUtil.badArgument();
-        }
         Integer id = address.getId();
         if(id == null){
-            return ResponseUtil.badArgumentValue();
+            return ResponseUtil.badArgument();
         }
 
         addressService.delete(id);

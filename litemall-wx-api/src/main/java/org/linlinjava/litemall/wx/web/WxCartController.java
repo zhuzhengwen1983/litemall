@@ -151,7 +151,7 @@ public class WxCartController {
             }
             existCart.setNumber((short) num);
             if(cartService.updateById(existCart) == 0){
-                return ResponseUtil.updatedDateExpired();
+                return ResponseUtil.updatedDataFailed();
             }
         }
 
@@ -224,7 +224,7 @@ public class WxCartController {
             }
             existCart.setNumber((short) num);
             if(cartService.updateById(existCart) == 0){
-                return ResponseUtil.updatedDateExpired();
+                return ResponseUtil.updatedDataFailed();
             }
         }
 
@@ -286,7 +286,7 @@ public class WxCartController {
 
         existCart.setNumber(number.shortValue());
         if(cartService.updateById(existCart) == 0){
-            return ResponseUtil.updatedDateExpired();
+            return ResponseUtil.updatedDataFailed();
         }
         return ResponseUtil.ok();
     }
@@ -296,7 +296,7 @@ public class WxCartController {
      * 如果原来没有勾选，则设置勾选状态；如果商品已经勾选，则设置非勾选状态。
      *
      * @param userId 用户ID
-     * @param body   购物车商品信息， { productIds: xxx }
+     * @param body   购物车商品信息， { productIds: xxx, isChecked: 1/0 }
      * @return 购物车信息
      * 成功则
      * {

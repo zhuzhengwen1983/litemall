@@ -68,7 +68,7 @@ public class WxAuthController {
      * }
      * 失败则 { errno: XXX, errmsg: XXX }
      */
-    @RequestMapping("login")
+    @PostMapping("login")
     public Object login(@RequestBody String body, HttpServletRequest request) {
         String username = JacksonUtil.parseString(body, "username");
         String password = JacksonUtil.parseString(body, "password");
@@ -125,7 +125,7 @@ public class WxAuthController {
      * }
      * 失败则 { errno: XXX, errmsg: XXX }
      */
-    @RequestMapping("login_by_weixin")
+    @PostMapping("login_by_weixin")
     public Object loginByWeixin(@RequestBody WxLoginInfo wxLoginInfo, HttpServletRequest request) {
         String code = wxLoginInfo.getCode();
         UserInfo userInfo = wxLoginInfo.getUserInfo();
@@ -167,7 +167,7 @@ public class WxAuthController {
             user.setLastLoginTime(LocalDateTime.now());
             user.setLastLoginIp(IpUtil.client(request));
             if(userService.updateById(user) == 0){
-                return ResponseUtil.updatedDateExpired();
+                return ResponseUtil.updatedDataFailed();
             }
         }
 
@@ -336,7 +336,7 @@ public class WxAuthController {
         user.setPassword(encodedPassword);
 
         if(userService.updateById(user) == 0){
-            return ResponseUtil.updatedDateExpired();
+            return ResponseUtil.updatedDataFailed();
         }
 
         return ResponseUtil.ok();
@@ -352,7 +352,7 @@ public class WxAuthController {
         LitemallUser user = userService.findById(userId);
         user.setMobile(phone);
         if(userService.updateById(user) == 0){
-            return ResponseUtil.updatedDateExpired();
+            return ResponseUtil.updatedDataFailed();
         }
         return ResponseUtil.ok();
     }

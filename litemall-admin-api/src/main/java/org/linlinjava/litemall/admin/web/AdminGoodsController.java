@@ -16,10 +16,12 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -68,6 +70,76 @@ public class AdminGoodsController {
         return ResponseUtil.ok(data);
     }
 
+    private Object validate(GoodsAllinone goodsAllinone) {
+        LitemallGoods goods = goodsAllinone.getGoods();
+        String name = goods.getName();
+        if(StringUtils.isEmpty(name)){
+            return ResponseUtil.badArgument();
+        }
+        String goodsSn = goods.getGoodsSn();
+        if(StringUtils.isEmpty(goodsSn)){
+            return ResponseUtil.badArgument();
+        }
+        Integer brandId = goods.getBrandId();
+        if(brandId == null){
+            return ResponseUtil.badArgument();
+        }
+        if(brandService.findById(brandId) == null) {
+            return ResponseUtil.badArgumentValue();
+        }
+        Integer categoryId = goods.getCategoryId();
+        if(categoryId == null){
+            return ResponseUtil.badArgument();
+        }
+        if(categoryService.findById(categoryId) == null){
+            return ResponseUtil.badArgumentValue();
+        }
+
+        LitemallGoodsAttribute[] attributes = goodsAllinone.getAttributes();
+        for(LitemallGoodsAttribute attribute : attributes){
+            String attr = attribute.getAttribute();
+            if(StringUtils.isEmpty(attr)){
+                return ResponseUtil.badArgument();
+            }
+            String value = attribute.getValue();
+            if(StringUtils.isEmpty(value)){
+                return ResponseUtil.badArgument();
+            }
+        }
+
+        LitemallGoodsSpecification[] specifications = goodsAllinone.getSpecifications();
+        for(LitemallGoodsSpecification specification : specifications){
+            String spec = specification.getSpecification();
+            if(StringUtils.isEmpty(spec)){
+                return ResponseUtil.badArgument();
+            }
+            String value = specification.getValue();
+            if(StringUtils.isEmpty(value)){
+                return ResponseUtil.badArgument();
+            }
+        }
+
+        LitemallProduct[] products = goodsAllinone.getProducts();
+        for(LitemallProduct product : products){
+            Integer number = product.getNumber();
+            if(number == null || number < 0){
+                return ResponseUtil.badArgument();
+            }
+
+            BigDecimal price = product.getPrice();
+            if(price == null){
+                return ResponseUtil.badArgument();
+            }
+
+            String[] productSpecifications = product.getSpecifications();
+            if(productSpecifications.length == 0){
+                return ResponseUtil.badArgument();
+            }
+        }
+
+        return null;
+    }
+
     /*
      * TODO
      * 目前商品修改的逻辑是
@@ -83,6 +155,11 @@ public class AdminGoodsController {
     public Object update(@LoginAdmin Integer adminId, @RequestBody GoodsAllinone goodsAllinone) {
         if (adminId == null) {
             return ResponseUtil.unlogin();
+        }
+
+        Object error = validate(goodsAllinone);
+        if(error != null){
+            return error;
         }
 
         LitemallGoods goods = goodsAllinone.getGoods();
@@ -133,6 +210,7 @@ public class AdminGoodsController {
         } catch (Exception ex) {
             txManager.rollback(status);
             logger.error("系统内部错误", ex);
+            return ResponseUtil.fail();
         }
         txManager.commit(status);
 
@@ -145,6 +223,10 @@ public class AdminGoodsController {
     public Object delete(@LoginAdmin Integer adminId, @RequestBody LitemallGoods goods) {
         if (adminId == null) {
             return ResponseUtil.unlogin();
+        }
+        Integer id = goods.getId();
+        if(id == null){
+            return ResponseUtil.badArgument();
         }
 
         // 开启事务管理
@@ -161,6 +243,7 @@ public class AdminGoodsController {
         } catch (Exception ex) {
             txManager.rollback(status);
             logger.error("系统内部错误", ex);
+            return ResponseUtil.fail();
         }
         txManager.commit(status);
         return ResponseUtil.ok();
@@ -170,6 +253,11 @@ public class AdminGoodsController {
     public Object create(@LoginAdmin Integer adminId, @RequestBody GoodsAllinone goodsAllinone) {
         if (adminId == null) {
             return ResponseUtil.unlogin();
+        }
+
+        Object error = validate(goodsAllinone);
+        if(error != null){
+            return error;
         }
 
         LitemallGoods goods = goodsAllinone.getGoods();
@@ -195,9 +283,11 @@ public class AdminGoodsController {
 
             //将生成的分享图片地址写入数据库
             String url = qCodeService.createGoodShareImage(goods.getId().toString(), goods.getPicUrl(), goods.getName());
-            goods.setShareUrl(url);
-            if(goodsService.updateById(goods) == 0){
-                throw new Exception("跟新数据已失效");
+            if(!StringUtils.isEmpty(url)) {
+                goods.setShareUrl(url);
+                if (goodsService.updateById(goods) == 0) {
+                    throw new Exception("跟新数据已失效");
+                }
             }
 
             // 商品规格表litemall_goods_specification
@@ -223,6 +313,7 @@ public class AdminGoodsController {
         } catch (Exception ex) {
             txManager.rollback(status);
             logger.error("系统内部错误", ex);
+            return ResponseUtil.fail();
         }
         txManager.commit(status);
 
